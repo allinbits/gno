@@ -122,16 +122,16 @@ func HasCallerSameNamespace(cur realm) bool {
 	return nestedpkg.IsSameNamespace()
 }
 
-func RealmCoins(cur realm) string {
-	return cur.Coins().String()
+func RealmSentCoins(cur realm) string {
+	return cur.SentCoins().String()
 }
 
 func BankerOriginSend(cur realm) string {
 	return banker.OriginSend().String()
 }
 
-func RTestsRealmCoins(cur realm) string {
-	return rsubtests.RealmCoins(cross)
+func RTestsRealmSentCoins(cur realm) string {
+	return rsubtests.RealmSentCoins(cross)
 }
 
 func RTestsOriginSend(cur realm) string {

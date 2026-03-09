@@ -25,8 +25,8 @@ func CallIsOriginCall(cur realm) bool {
 	return runtime.PreviousRealm().IsUser()
 }
 
-func RealmCoins(cur realm) string {
-	return cur.Coins().String()
+func RealmSentCoins(cur realm) string {
+	return cur.SentCoins().String()
 }
 
 func BankerOriginSend(cur realm) string {

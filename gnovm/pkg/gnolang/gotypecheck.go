@@ -43,6 +43,7 @@ type realm interface {
     Address() address
     PkgPath() string
     Coins() gnocoins
+    SentCoins() gnocoins
     Send(coins gnocoins, to address) error
     Previous() realm
     Origin() realm
