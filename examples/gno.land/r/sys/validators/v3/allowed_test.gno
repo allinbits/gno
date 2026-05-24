@@ -34,9 +34,9 @@ func TestAddValidator_NotAllowed(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewCodeRealm("gno.land/r/demo/unknown"))
 
 	op := testutils.TestAddress("op-A")
-	urequire.AbortsWithMessage(t,
+	urequire.AbortsWithMessage(t, cur,
 		"realm gno.land/r/demo/unknown is not allowed to modify the validator set",
-		func() { AddValidator(cross, ValoperChange{OperatorAddress: op, Power: 10}, pubKeyA, mustAddr(t, pubKeyA)) },
+		func() { AddValidator(cross(cur), ValoperChange{OperatorAddress: op, Power: 10}, pubKeyA, mustAddr(t, pubKeyA)) },
 	)
 }
 
@@ -48,9 +48,9 @@ func TestAddValidator_UserNotAllowed(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewUserRealm(mustAddr(t, pubKeyA)))
 
 	op := testutils.TestAddress("op-A")
-	urequire.AbortsWithMessage(t,
+	urequire.AbortsWithMessage(t, cur,
 		"caller must be a realm, not a user",
-		func() { AddValidator(cross, ValoperChange{OperatorAddress: op, Power: 10}, pubKeyA, mustAddr(t, pubKeyA)) },
+		func() { AddValidator(cross(cur), ValoperChange{OperatorAddress: op, Power: 10}, pubKeyA, mustAddr(t, pubKeyA)) },
 	)
 }
 
@@ -72,7 +72,7 @@ func TestAddValidator_Allowed(cur realm, t *testing.T) {
 
 	testing.SetRealm(testing.NewCodeRealm(allowedPath))
 
-	AddValidator(cross, ValoperChange{OperatorAddress: op, Power: 10}, pubKeyB, mustAddr(t, pubKeyB))
+	AddValidator(cross(cur), ValoperChange{OperatorAddress: op, Power: 10}, pubKeyB, mustAddr(t, pubKeyB))
 	uassert.True(t, IsValidator(mustAddr(t, pubKeyB)))
 }
 
@@ -95,10 +95,10 @@ func TestRemoveValidator_Allowed(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewCodeRealm(allowedPath))
 
 	addrB := mustAddr(t, pubKeyB)
-	AddValidator(cross, ValoperChange{OperatorAddress: op, Power: 10}, pubKeyB, mustAddr(t, pubKeyB))
+	AddValidator(cross(cur), ValoperChange{OperatorAddress: op, Power: 10}, pubKeyB, mustAddr(t, pubKeyB))
 	uassert.True(t, IsValidator(addrB))
 
-	RemoveValidator(cross, op)
+	RemoveValidator(cross(cur), op)
 	uassert.False(t, IsValidator(addrB))
 }
 
@@ -110,9 +110,9 @@ func TestRemoveValidator_NotAllowed(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewCodeRealm("gno.land/r/demo/unknown"))
 
 	op := testutils.TestAddress("op-A")
-	urequire.AbortsWithMessage(t,
+	urequire.AbortsWithMessage(t, cur,
 		"realm gno.land/r/demo/unknown is not allowed to modify the validator set",
-		func() { RemoveValidator(cross, op) },
+		func() { RemoveValidator(cross(cur), op) },
 	)
 }
 
@@ -124,45 +124,45 @@ func TestAddValidator_RejectsPowerZero(cur realm, t *testing.T) {
 	testing.SetRealm(testing.NewCodeRealm(allowedPath))
 
 	op := testutils.TestAddress("op-A")
-	urequire.AbortsWithMessage(t,
+	urequire.AbortsWithMessage(t, cur,
 		"AddValidator requires Power > 0; use RemoveValidator for removals",
-		func() { AddValidator(cross, ValoperChange{OperatorAddress: op, Power: 0}, pubKeyA, mustAddr(t, pubKeyA)) },
+		func() { AddValidator(cross(cur), ValoperChange{OperatorAddress: op, Power: 0}, pubKeyA, mustAddr(t, pubKeyA)) },
 	)
 }
 
-func TestNewPropAllowedRealmUpdateRequest_RejectsEmptyTitle(t *testing.T) {
-	uassert.PanicsContains(t, "proposal title is empty", func() {
-		_ = NewPropAllowedRealmUpdateRequest(
+func TestNewPropAllowedRealmUpdateRequest_RejectsEmptyTitle(cur realm, t *testing.T) {
+	uassert.PanicsContains(t, cur, "proposal title is empty", func() {
+		_ = NewPropAllowedRealmUpdateRequest(cur,
 			[]string{"gno.land/r/demo/ics"}, nil, "   ", "",
 		)
 	})
 }
 
-func TestNewPropAllowedRealmUpdateRequest_RejectsEmptyAddAndRemove(t *testing.T) {
-	uassert.PanicsContains(t, "proposal must add or remove at least one realm", func() {
-		_ = NewPropAllowedRealmUpdateRequest(nil, nil, "title", "")
+func TestNewPropAllowedRealmUpdateRequest_RejectsEmptyAddAndRemove(cur realm, t *testing.T) {
+	uassert.PanicsContains(t, cur, "proposal must add or remove at least one realm", func() {
+		_ = NewPropAllowedRealmUpdateRequest(cur, nil, nil, "title", "")
 	})
 }
 
-func TestNewPropAllowedRealmUpdateRequest_RejectsDuplicateInAdd(t *testing.T) {
-	uassert.PanicsContains(t, "duplicate realm in proposal: gno.land/r/demo/ics", func() {
-		_ = NewPropAllowedRealmUpdateRequest(
+func TestNewPropAllowedRealmUpdateRequest_RejectsDuplicateInAdd(cur realm, t *testing.T) {
+	uassert.PanicsContains(t, cur, "duplicate realm in proposal: gno.land/r/demo/ics", func() {
+		_ = NewPropAllowedRealmUpdateRequest(cur,
 			[]string{"gno.land/r/demo/ics", "gno.land/r/demo/ics"}, nil, "dup-add", "",
 		)
 	})
 }
 
-func TestNewPropAllowedRealmUpdateRequest_RejectsDuplicateInRemove(t *testing.T) {
-	uassert.PanicsContains(t, "duplicate realm in proposal: gno.land/r/demo/ics", func() {
-		_ = NewPropAllowedRealmUpdateRequest(
+func TestNewPropAllowedRealmUpdateRequest_RejectsDuplicateInRemove(cur realm, t *testing.T) {
+	uassert.PanicsContains(t, cur, "duplicate realm in proposal: gno.land/r/demo/ics", func() {
+		_ = NewPropAllowedRealmUpdateRequest(cur,
 			nil, []string{"gno.land/r/demo/ics", "gno.land/r/demo/ics"}, "dup-remove", "",
 		)
 	})
 }
 
-func TestNewPropAllowedRealmUpdateRequest_RejectsAddRemoveOverlap(t *testing.T) {
-	uassert.PanicsContains(t, "duplicate realm in proposal: gno.land/r/demo/ics", func() {
-		_ = NewPropAllowedRealmUpdateRequest(
+func TestNewPropAllowedRealmUpdateRequest_RejectsAddRemoveOverlap(cur realm, t *testing.T) {
+	uassert.PanicsContains(t, cur, "duplicate realm in proposal: gno.land/r/demo/ics", func() {
+		_ = NewPropAllowedRealmUpdateRequest(cur,
 			[]string{"gno.land/r/demo/ics"},
 			[]string{"gno.land/r/demo/ics"},
 			"overlap", "",
@@ -170,8 +170,8 @@ func TestNewPropAllowedRealmUpdateRequest_RejectsAddRemoveOverlap(t *testing.T) 
 	})
 }
 
-func TestNewPropAllowedRealmUpdateRequest_DescriptionRendering(t *testing.T) {
-	pr := NewPropAllowedRealmUpdateRequest(
+func TestNewPropAllowedRealmUpdateRequest_DescriptionRendering(cur realm, t *testing.T) {
+	pr := NewPropAllowedRealmUpdateRequest(cur,
 		[]string{"gno.land/r/demo/ics"},
 		[]string{"gno.land/r/demo/legacy"},
 		"mixed",
