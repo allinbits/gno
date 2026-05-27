@@ -43,7 +43,11 @@ func AddValidator(cur realm, change ValoperChange, signingPubKey string, signing
 			KeepRunning:    true,
 		})
 	}
-	exec := newValoperChangeExecutor(cur, []ValoperChange{change}, trustLevelRatio)
+	// enforceCooldown=false: the allow-list path serves whitelisted realms
+	// (e.g. the IBC VAAS consumer) whose provider-driven valset updates must
+	// not be rate-limited by the governance cooldown. The trust-level check
+	// inside the executor still applies.
+	exec := newValoperChangeExecutorWithCooldown(cur, []ValoperChange{change}, trustLevelRatio, false)
 	if err := exec.Execute(cross(cur)); err != nil {
 		panic(err)
 	}
@@ -57,7 +61,8 @@ func RemoveValidator(cur realm, op address) {
 	if _, ok := valoperCache.Get(op.String()); !ok {
 		return
 	}
-	exec := newValoperChangeExecutor(cur, []ValoperChange{{OperatorAddress: op, Power: 0}}, trustLevelRatio)
+	// enforceCooldown=false — see AddValidator.
+	exec := newValoperChangeExecutorWithCooldown(cur, []ValoperChange{{OperatorAddress: op, Power: 0}}, trustLevelRatio, false)
 	if err := exec.Execute(cross(cur)); err != nil {
 		panic(err)
 	}

@@ -156,11 +156,23 @@ func NewValidatorProposalRequest(cur realm, changes []ValoperChange, title, desc
 // time. The IBC-trust-level rule is checked against this snapshot, not
 // the package-level trustLevelRatio that may have moved by exec time.
 func newValoperChangeExecutor(cur realm, changes []ValoperChange, snapshotTrustLevel trustRatio) dao.Executor {
+	return newValoperChangeExecutorWithCooldown(cur, changes, snapshotTrustLevel, true)
+}
+
+// newValoperChangeExecutorWithCooldown is newValoperChangeExecutor with the
+// governance cooldown made optional. The GovDAO proposal path passes
+// enforceCooldown=true. The allow-list path (AddValidator/RemoveValidator in
+// allowed.gno, used by whitelisted realms such as the IBC VAAS consumer)
+// passes false: provider-driven valset updates legitimately arrive faster
+// than valsetUpdateCooldown and must not be rate-limited like governance
+// proposals. The per-change trust-level check below still applies in both
+// modes, so IBC light-client safety is preserved.
+func newValoperChangeExecutorWithCooldown(cur realm, changes []ValoperChange, snapshotTrustLevel trustRatio, enforceCooldown bool) dao.Executor {
 	callback := func(cur realm) error {
 		// Cooldown re-check: the binding source of truth. Creation-time
 		// only filters obvious failures; a proposal can sit in GovDAO
 		// while another proposal lands first.
-		if time.Since(lastValsetUpdate) < valsetUpdateCooldown {
+		if enforceCooldown && time.Since(lastValsetUpdate) < valsetUpdateCooldown {
 			panic(errValsetUpdateCooldown)
 		}
 
@@ -272,7 +284,9 @@ func newValoperChangeExecutor(cur realm, changes []ValoperChange, snapshotTrustL
 		}
 		sort.Strings(entries)
 		sysparams.SetValsetProposal(cross(cur), entries)
-		lastValsetUpdate = time.Now()
+		if enforceCooldown {
+			lastValsetUpdate = time.Now()
+		}
 		return nil
 	}
 
