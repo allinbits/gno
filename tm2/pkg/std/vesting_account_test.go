@@ -404,6 +404,93 @@ func TestContinuousVestingAccount_PartialVestingMultiDenom(t *testing.T) {
 	assert.Equal(t, int64(500), spendable.AmountOf("uatom"))
 }
 
+// TestVestingAccount_FreeAndVestingBalance verifies that an account can hold
+// a balance split into two parts: a "free" portion that is immediately and
+// always spendable (behaving like a normal account), and a vesting portion
+// that unlocks according to the schedule. The free portion is the difference
+// between the total balance and OriginalVesting.
+func TestVestingAccount_FreeAndVestingBalance(t *testing.T) {
+	t.Parallel()
+
+	privKey := secp256k1.GenPrivKey()
+	pubKey := privKey.PubKey()
+	addr := pubKey.Address()
+
+	const (
+		totalBalance  int64 = 1000
+		vestingAmount int64 = 300
+		freeAmount    int64 = totalBalance - vestingAmount // 700, always spendable
+	)
+	baseAcc := NewBaseAccount(addr, Coins{NewCoin("ugnot", totalBalance)}, pubKey, 0, 0)
+	schedule := VestingSchedule{
+		OriginalVesting: Coins{NewCoin("ugnot", vestingAmount)},
+		StartTime:       100,
+		EndTime:         200,
+	}
+
+	cva, err := NewContinuousVestingAccount(baseAcc, schedule)
+	require.NoError(t, err)
+	dva, err := NewDelayedVestingAccount(baseAcc, schedule)
+	require.NoError(t, err)
+
+	cases := []struct {
+		name             string
+		account          VestingAccount
+		halfwayLocked    int64 // expected locked at t=150 (halfway through the schedule)
+		halfwaySpendable int64 // expected spendable at t=150
+	}{
+		{
+			// Continuous: 150 of 300 vested halfway → 150 still locked.
+			name:             "continuous",
+			account:          cva,
+			halfwayLocked:    150,
+			halfwaySpendable: freeAmount + 150, // 700 free + 150 vested
+		},
+		{
+			// Delayed: nothing vests until the cliff (EndTime) → all 300 locked.
+			name:             "delayed",
+			account:          dva,
+			halfwayLocked:    300,
+			halfwaySpendable: freeAmount, // only the free portion
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			va := tc.account
+
+			// The free portion is NOT part of the vesting schedule.
+			assert.Equal(t, vestingAmount, va.GetOriginalVesting().AmountOf("ugnot"), "original vesting")
+			assert.Equal(t, totalBalance, va.GetCoins().AmountOf("ugnot"), "total balance")
+
+			// Before the schedule unlocks anything, only the free portion is
+			// spendable — exactly like a normal account holding `freeAmount`.
+			// A purely-vesting account (balance == OriginalVesting) would be
+			// fully locked here; this account is not, because of the free part.
+			lockedEarly := va.LockedCoins(time.Unix(50, 0)).AmountOf("ugnot")
+			assert.LessOrEqual(t, lockedEarly, vestingAmount, "locked never exceeds vesting portion")
+			assert.Equal(t, freeAmount, SpendableCoins(va, time.Unix(50, 0)).AmountOf("ugnot"),
+				"free portion spendable before vesting starts")
+
+			// Halfway through the schedule: the free portion plus whatever has
+			// vested so far is spendable. Continuous unlocks linearly; delayed
+			// unlocks nothing until the cliff.
+			assert.Equal(t, tc.halfwayLocked, va.LockedCoins(time.Unix(150, 0)).AmountOf("ugnot"),
+				"locked halfway")
+			assert.Equal(t, tc.halfwaySpendable, SpendableCoins(va, time.Unix(150, 0)).AmountOf("ugnot"),
+				"spendable halfway")
+
+			// After the schedule completes, the entire balance is spendable.
+			assert.True(t, va.LockedCoins(time.Unix(300, 0)).IsZero(), "nothing locked after vesting")
+			assert.Equal(t, totalBalance, SpendableCoins(va, time.Unix(300, 0)).AmountOf("ugnot"),
+				"full balance spendable after vesting")
+		})
+	}
+}
+
 func TestContinuousVestingAccount_RejectsVestingExceedingBalance(t *testing.T) {
 	t.Parallel()
 
