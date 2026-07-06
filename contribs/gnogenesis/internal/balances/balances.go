@@ -28,6 +28,7 @@ func NewBalancesCmd(io commands.IO) *commands.Command {
 
 	cmd.AddSubCommands(
 		newBalancesAddCmd(cfg, io),
+		newBalancesVestingCmd(cfg, io),
 		newBalancesRemoveCmd(cfg, io),
 		newBalancesExportCmd(cfg, io),
 	)
